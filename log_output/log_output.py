@@ -1,22 +1,14 @@
-import time
-import random
-import string
+# app.py
+import time, random, string
 from datetime import datetime
 
-def generate_random_string(length=10):
-    """Generate a random alphanumeric string of given length."""
+def generate_random_string(length=12):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
-def main():
-    # Generate and store random string
-    random_str = generate_random_string(12)
-    print(f"{random_str}")
+random_str = generate_random_string()
+print(f"Generated string on startup: {random_str}", flush=True)
 
-    # Loop to print with timestamp
-    while True:
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{current_time}] {random_str}")
-        time.sleep(5)
-
-if __name__ == "__main__":
-    main()
+while True:
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] Stored string: {random_str}", flush=True)
+    time.sleep(5)
