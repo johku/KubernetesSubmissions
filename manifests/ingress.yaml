@@ -9,6 +9,7 @@ spec:
   rules:
     - http:
         paths:
+          # other routes first (e.g., ping-pong)
           - path: /pingpong
             pathType: Prefix
             backend:
@@ -16,11 +17,20 @@ spec:
                 name: ping-pong-svc
                 port:
                   number: 80
-          - path: /
+          # <-- add this explicit mapping:
+          - path: /status
             pathType: Prefix
             backend:
               service:
                 name: log-output-svc
+                port:
+                  number: 80
+          # catch-all root
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: todo-app-svc        # or log-output-svc if you prefer
                 port:
                   number: 80
 

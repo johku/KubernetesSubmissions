@@ -1,0 +1,7 @@
+FROM python:3.11-slim
+WORKDIR /app
+COPY writer.py .
+ENV PYTHONUNBUFFERED=1
+# no extra deps
+CMD ["python", "writer.py"]
+
