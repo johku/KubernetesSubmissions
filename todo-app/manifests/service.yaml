@@ -5,11 +5,11 @@ metadata:
   labels:
     app: todo-app
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: todo-app
   ports:
     - name: http
-      port: 80           # the Service's port (inside cluster)
-      targetPort: 8080   # your container port from app.py
-      nodePort: 30080    # published on the node; mapped to host 8082 by k3d
+      port: 80          # service port (inside cluster)
+      targetPort: 8080  # your Flask PORT
+
