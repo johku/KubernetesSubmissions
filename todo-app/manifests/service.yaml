@@ -5,11 +5,10 @@ metadata:
   labels:
     app: todo-app
 spec:
-  type: ClusterIP
   selector:
     app: todo-app
   ports:
-    - name: http
-      port: 80          # service port (inside cluster)
-      targetPort: 8080  # your Flask PORT
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
 

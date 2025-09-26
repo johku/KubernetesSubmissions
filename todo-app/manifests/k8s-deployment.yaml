@@ -14,17 +14,29 @@ spec:
       labels:
         app: todo-app
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: k3d-k3s-default-agent-0   # same as PV
+      volumes:
+        - name: images-pv
+          persistentVolumeClaim:
+            claimName: todo-images-pvc
       containers:
         - name: todo-app
-          image: todo-app:1.3              # <-- updated tag
+          image: todo-app:1.4             # bump your tag
           imagePullPolicy: IfNotPresent
           env:
             - name: PORT
-              value: "8080"                 # change to test other ports
-            - name: GREETING
-              value: "Hello from Kubernetes 👋"
+              value: "8080"
+            - name: DATA_DIR
+              value: "/data"               # where we store photo.jpg + meta
+            # (Optional for faster testing)
+            # - name: IMAGE_TTL_SECONDS
+            #   value: "15"
           ports:
-            - containerPort: 8080           # informational
+            - containerPort: 8080
+          volumeMounts:
+            - name: images-pv
+              mountPath: /data
           resources:
             requests:
               cpu: "50m"
