@@ -2,14 +2,11 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: apps-ing
-  labels:
-    app: shared-ingress
 spec:
   ingressClassName: traefik
   rules:
     - http:
         paths:
-          # other routes first (e.g., ping-pong)
           - path: /pingpong
             pathType: Prefix
             backend:
@@ -17,7 +14,6 @@ spec:
                 name: ping-pong-svc
                 port:
                   number: 80
-          # <-- add this explicit mapping:
           - path: /status
             pathType: Prefix
             backend:
@@ -25,12 +21,11 @@ spec:
                 name: log-output-svc
                 port:
                   number: 80
-          # catch-all root
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: todo-app-svc        # or log-output-svc if you prefer
+                name: todo-app-svc
                 port:
                   number: 80
 
