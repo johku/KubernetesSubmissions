@@ -14,24 +14,13 @@ spec:
       labels:
         app: ping-pong
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: k3d-k3s-default-agent-0  # same node as PV
-      volumes:
-        - name: shared-pv
-          persistentVolumeClaim:
-            claimName: pinglog-pvc
       containers:
         - name: ping-pong
-          image: ping-pong:1.0
+          image: ping-pong:1.3
           imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
           env:
             - name: PORT
               value: "8080"
-            - name: DATA_DIR
-              value: "/shared"
-          volumeMounts:
-            - name: shared-pv
-              mountPath: /shared
-          ports:
-            - containerPort: 8080
 

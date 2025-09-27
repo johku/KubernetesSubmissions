@@ -1,3 +1,4 @@
+# log_output/manifests/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,12 +15,9 @@ spec:
       labels:
         app: log-output
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: k3d-k3s-default-agent-0
       volumes:
-        - name: shared-pv
-          persistentVolumeClaim:
-            claimName: pinglog-pvc
+        - name: shared
+          emptyDir: {}
       containers:
         - name: writer
           image: log-writer:0.1
@@ -30,21 +28,23 @@ spec:
             - name: INTERVAL_SECONDS
               value: "5"
           volumeMounts:
-            - name: shared-pv
+            - name: shared
               mountPath: /data
         - name: reader
-          image: log-reader:0.1
+          image: log-reader:0.4
           imagePullPolicy: IfNotPresent
           env:
             - name: PORT
               value: "8080"
             - name: DATA_DIR
               value: "/data"
+            - name: PINGPONG_URL
+              value: "http://ping-pong-svc/pings"
           ports:
             - name: http
               containerPort: 8080
           volumeMounts:
-            - name: shared-pv
+            - name: shared
               mountPath: /data
           readinessProbe:
             httpGet:
