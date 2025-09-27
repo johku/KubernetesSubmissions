@@ -25,3 +25,5 @@
 [1.12](https://github.com/johku/KubernetesSubmissions/tree/1.12/todo-app)
 
 [1.13](https://github.com/johku/KubernetesSubmissions/tree/1.13/todo-app)
+
+[2.1](https://github.com/johku/KubernetesSubmissions/tree/2.1/log_output)
