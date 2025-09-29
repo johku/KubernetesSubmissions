@@ -4,6 +4,7 @@ metadata:
   name: ping-pong
   labels:
     app: ping-pong
+  namespace: exercises
 spec:
   replicas: 1
   selector:

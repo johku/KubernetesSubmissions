@@ -5,6 +5,7 @@ metadata:
   name: log-output
   labels:
     app: log-output
+  namespace: exercises
 spec:
   replicas: 1
   selector:
