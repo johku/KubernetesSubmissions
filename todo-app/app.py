@@ -1,16 +1,20 @@
-import os, time, json, requests
+import os
+import time
+import json
+import requests
 from flask import Flask, send_file, Response
 
 app = Flask(__name__)
 
+# ---- Config ----
 PORT = int(os.getenv("PORT", "8080"))
-DATA_DIR = os.getenv("DATA_DIR", "/data")
-TTL_SECONDS = int(os.getenv("IMAGE_TTL_SECONDS", "600"))  # 10 minutes
+DATA_DIR = os.getenv("DATA_DIR", "/data")            # persistent mount for image cache
+TTL_SECONDS = int(os.getenv("IMAGE_TTL_SECONDS", "600"))  # default 10 minutes
 
 IMG_PATH = os.path.join(DATA_DIR, "photo.jpg")
 META_PATH = os.path.join(DATA_DIR, "photo_meta.json")
 
-# --- Image cache helpers (unchanged idea) ---
+# ---- Image cache helpers ----
 def _load_meta():
     try:
         with open(META_PATH, "r", encoding="utf-8") as f:
@@ -36,6 +40,7 @@ def _need_new_image():
 
 def _fetch_and_store():
     os.makedirs(DATA_DIR, exist_ok=True)
+    # Get redirect to a random image and then download actual bytes
     r = requests.get("https://picsum.photos/1200", timeout=10)
     r.raise_for_status()
     img = requests.get(r.url, timeout=15)
@@ -44,22 +49,16 @@ def _fetch_and_store():
         f.write(img.content)
     _save_meta({"ts": time.time(), "grace_used": False})
 
-# --- Simple, hardcoded todos for now ---
-HARDCODED_TODOS = [
-    "learn k8s Deployments",
-    "hook Services + Ingress",
-    "persist images with PVC",
-]
-
+# ---- Routes ----
 @app.get("/")
 def root():
-    # Minimal inline UI: title, image, input (max 140), button, hardcoded list
-    html = f"""
-<!doctype html>
+    # Minimal SPA: image + todo form + list (calls backend at /api/todos)
+    html = f"""<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>todo-app</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {{ color-scheme: light dark; }}
     body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }}
@@ -71,56 +70,95 @@ def root():
     .muted {{ color: #888; font-size: 0.9rem; }}
     ul {{ padding-left: 1.2rem; }}
     li {{ margin: 6px 0; }}
+    .error {{ color: #c00; }}
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>todo-app</h1>
+
     <img src="/image" alt="Random (cached) image" />
+    <p class="muted">devops with kubernetes 2025</p>
 
     <h2 style="margin-top:18px;">Create a todo</h2>
     <div class="row">
-      <input id="todoInput" type="text" maxlength="140" placeholder="What needs to be done? (max 140 chars)" />
+      <input id="todoInput" type="text" maxlength="140"
+             placeholder="What needs to be done? (max 140 chars)" />
       <button id="todoBtn" disabled>Create todo</button>
     </div>
-    <div class="muted">
-      <span id="counter">0</span>/140
-      &middot;
-      (button is a no-op for this step)
-    </div>
+    <div class="muted"><span id="counter">0</span>/140</div>
+    <div id="error" class="error" style="display:none;"></div>
 
     <h2 style="margin-top:18px;">Existing todos</h2>
-    <ul id="todoList">
-      {"".join(f"<li>{t}</li>" for t in HARDCODED_TODOS)}
-    </ul>
-
-    <p class="muted">devops with kubernetes 2025</p>
+    <ul id="todoList"><li class="muted">Loading…</li></ul>
   </div>
 
   <script>
     const input = document.getElementById('todoInput');
-    const btn   = document.getElementById('todoBtn');
+    const btn = document.getElementById('todoBtn');
     const counter = document.getElementById('counter');
+    const list = document.getElementById('todoList');
+    const errorBox = document.getElementById('error');
+
+    function setError(msg) {{
+      if (!msg) {{ errorBox.style.display = 'none'; errorBox.textContent = ''; return; }}
+      errorBox.textContent = msg;
+      errorBox.style.display = 'block';
+    }}
 
     function updateUI() {{
       const len = input.value.length;
       counter.textContent = len.toString();
-      // enable if 1..140
       btn.disabled = !(len > 0 && len <= 140);
     }}
     input.addEventListener('input', updateUI);
     updateUI();
 
-    // For this exercise, clicking doesn't submit yet.
-    btn.addEventListener('click', (e) => {{
+    async function loadTodos() {{
+      try {{
+        setError('');
+        const r = await fetch('/api/todos', {{ cache: 'no-store' }});
+        if (!r.ok) throw new Error('failed to fetch todos');
+        const items = await r.json();
+        list.innerHTML = items.length
+          ? items.map(t => `<li>[#${{t.id}}] ${{t.text}}</li>`).join('')
+          : '<li class="muted">No todos yet</li>';
+      }} catch (e) {{
+        list.innerHTML = '<li class="muted">Failed to load todos</li>';
+        setError(e.message || 'failed to load todos');
+      }}
+    }}
+
+    btn.addEventListener('click', async (e) => {{
       e.preventDefault();
-      // no-op now; next exercise we’ll wire backend
-      alert('Submit not implemented yet (will be in next step).');
+      const text = input.value.trim();
+      if (!text || text.length > 140) return;
+      btn.disabled = true;
+      try {{
+        setError('');
+        const r = await fetch('/api/todos', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ text }})
+        }});
+        if (!r.ok) {{
+          const body = await r.json().catch(() => ({{}}));
+          throw new Error(body.error || 'create failed');
+        }}
+        input.value = '';
+        updateUI();
+        await loadTodos();
+      }} catch (e) {{
+        setError(e.message || 'failed to create todo');
+      }} finally {{
+        btn.disabled = false;
+      }}
     }});
+
+    loadTodos();
   </script>
 </body>
-</html>
-"""
+</html>"""
     return Response(html, mimetype="text/html")
 
 @app.get("/image")
@@ -130,8 +168,13 @@ def image():
         try:
             _fetch_and_store()
         except Exception as e:
-            return Response(f"Image fetch failed: {e}\\n", status=503, mimetype="text/plain")
+            # Degrade gracefully if Picsum is unavailable
+            return Response(f"Image fetch failed: {e}\n", status=503, mimetype="text/plain")
     return send_file(IMG_PATH, mimetype="image/jpeg")
+
+@app.get("/healthz")
+def healthz():
+    return "ok", 200
 
 if __name__ == "__main__":
     print(f"Server started in port {PORT}", flush=True)
