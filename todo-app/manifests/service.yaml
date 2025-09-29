@@ -4,6 +4,7 @@ metadata:
   name: todo-app-svc
   labels:
     app: todo-app
+  namespace: project
 spec:
   selector:
     app: todo-app

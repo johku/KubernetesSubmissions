@@ -1,15 +1,19 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: todo-app-ing
-  labels:
-    app: todo-app
+  name: project-ing
+  namespace: project
 spec:
-  # Traefik is the default in k3s; include for clarity
-  ingressClassName: traefik
   rules:
     - http:
         paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: todo-backend-svc
+                port:
+                  number: 80
           - path: /
             pathType: Prefix
             backend:

@@ -4,6 +4,7 @@ metadata:
   name: todo-app
   labels:
     app: todo-app
+  namespace: project
 spec:
   replicas: 1
   selector:
