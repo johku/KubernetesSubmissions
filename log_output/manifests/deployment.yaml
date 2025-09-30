@@ -1,10 +1,7 @@
-# log_output/manifests/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: log-output
-  labels:
-    app: log-output
   namespace: exercises
 spec:
   replicas: 1
@@ -16,41 +13,46 @@ spec:
       labels:
         app: log-output
     spec:
-      volumes:
-        - name: shared
-          emptyDir: {}
       containers:
-        - name: writer
-          image: log-writer:0.1
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: DATA_DIR
-              value: "/data"
-            - name: INTERVAL_SECONDS
-              value: "5"
-          volumeMounts:
-            - name: shared
-              mountPath: /data
-        - name: reader
-          image: log-reader:0.4
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: PORT
-              value: "8080"
-            - name: DATA_DIR
-              value: "/data"
-            - name: PINGPONG_URL
-              value: "http://ping-pong-svc/pings"
-          ports:
-            - name: http
-              containerPort: 8080
-          volumeMounts:
-            - name: shared
-              mountPath: /data
-          readinessProbe:
-            httpGet:
-              path: /status
-              port: http
-            initialDelaySeconds: 2
-            periodSeconds: 5
+      - name: writer
+        image: log-writer:0.1
+        env:
+        - name: DATA_DIR
+          value: /data
+        - name: INTERVAL_SECONDS
+          value: "5"
+        volumeMounts:
+        - name: shared
+          mountPath: /data
+      - name: reader
+        image: log-reader:0.5
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: DATA_DIR
+          value: /data
+        - name: PINGPONG_URL
+          value: http://ping-pong-svc/pings
+        - name: MESSAGE
+          valueFrom:
+            configMapKeyRef:
+              name: log-output-config
+              key: MESSAGE
+        volumeMounts:
+        - name: shared
+          mountPath: /data
+        - name: config-volume
+          mountPath: /etc/config
+          readOnly: true
+      volumes:
+      - name: shared
+        emptyDir: {}
+      - name: config-volume
+        configMap:
+          name: log-output-config
+          items:
+          - key: information.txt
+            path: information.txt
 
