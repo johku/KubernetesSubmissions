@@ -1,0 +1,9 @@
+# project/todo-backend-config.yaml (optional)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: todo-backend-config
+  namespace: project
+data:
+  PORT: "8080"
+

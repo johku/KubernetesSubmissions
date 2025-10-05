@@ -2,47 +2,60 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: todo-app
+  namespace: project
   labels:
     app: todo-app
-  namespace: project
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: todo-app
+  strategy:
+    type: RollingUpdate
   template:
     metadata:
       labels:
         app: todo-app
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: k3d-k3s-default-agent-0   # same as PV
-      volumes:
-        - name: images-pv
-          persistentVolumeClaim:
-            claimName: todo-images-pvc
       containers:
         - name: todo-app
-          image: todo-app:1.4             # bump your tag
+          image: todo-app:1.8
           imagePullPolicy: IfNotPresent
-          env:
-            - name: PORT
-              value: "8080"
-            - name: DATA_DIR
-              value: "/data"               # where we store photo.jpg + meta
-            # (Optional for faster testing)
-            # - name: IMAGE_TTL_SECONDS
-            #   value: "15"
           ports:
             - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: todo-app-config
+          # If you want to pin the port explicitly even if it's not in the ConfigMap:
+          # env:
+          #   - name: PORT
+          #     value: "8080"
           volumeMounts:
-            - name: images-pv
+            - name: images
               mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
           resources:
             requests:
-              cpu: "50m"
+              cpu: "10m"
               memory: "64Mi"
             limits:
               cpu: "200m"
-              memory: "128Mi"
+              memory: "256Mi"
+      volumes:
+        - name: images
+          persistentVolumeClaim:
+            claimName: todo-images-pvc
 

@@ -6,10 +6,17 @@ from flask import Flask, send_file, Response
 
 app = Flask(__name__)
 
-# ---- Config ----
+# ---- Config (env-driven) ----
 PORT = int(os.getenv("PORT", "8080"))
-DATA_DIR = os.getenv("DATA_DIR", "/data")            # persistent mount for image cache
-TTL_SECONDS = int(os.getenv("IMAGE_TTL_SECONDS", "600"))  # default 10 minutes
+DATA_DIR = os.getenv("DATA_DIR", "/data")                    # persistent mount for image cache
+TTL_SECONDS = int(os.getenv("IMAGE_TTL_SECONDS", "600"))     # default 10 minutes
+IMAGE_SOURCE_URL = os.getenv("IMAGE_SOURCE_URL", "https://picsum.photos/1200")
+API_BASE = os.getenv("API_BASE", "/api")                     # SPA calls backend using this base
+APP_TITLE = os.getenv("APP_TITLE", "todo-app")
+APP_FOOTER = os.getenv("APP_FOOTER", "devops with kubernetes 2025")
+MAX_TODO_LENGTH = int(os.getenv("MAX_TODO_LENGTH", "140"))   # keep in sync with backend
+HTTP_TIMEOUT_PRIMARY = float(os.getenv("HTTP_TIMEOUT_PRIMARY", "10"))
+HTTP_TIMEOUT_IMAGE = float(os.getenv("HTTP_TIMEOUT_IMAGE", "15"))
 
 IMG_PATH = os.path.join(DATA_DIR, "photo.jpg")
 META_PATH = os.path.join(DATA_DIR, "photo_meta.json")
@@ -40,10 +47,10 @@ def _need_new_image():
 
 def _fetch_and_store():
     os.makedirs(DATA_DIR, exist_ok=True)
-    # Get redirect to a random image and then download actual bytes
-    r = requests.get("https://picsum.photos/1200", timeout=10)
+    # IMAGE_SOURCE_URL may redirect to the actual image; follow and download bytes
+    r = requests.get(IMAGE_SOURCE_URL, timeout=HTTP_TIMEOUT_PRIMARY)
     r.raise_for_status()
-    img = requests.get(r.url, timeout=15)
+    img = requests.get(r.url, timeout=HTTP_TIMEOUT_IMAGE)
     img.raise_for_status()
     with open(IMG_PATH, "wb") as f:
         f.write(img.content)
@@ -52,12 +59,13 @@ def _fetch_and_store():
 # ---- Routes ----
 @app.get("/")
 def root():
-    # Minimal SPA: image + todo form + list (calls backend at /api/todos)
+    # Minimal SPA: image + todo form + list (calls backend at API_BASE + /todos)
+    # Inject all runtime config (no hard-coded constants).
     html = f"""<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>todo-app</title>
+  <title>{APP_TITLE}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {{ color-scheme: light dark; }}
@@ -75,18 +83,18 @@ def root():
 </head>
 <body>
   <div class="wrap">
-    <h1>todo-app</h1>
+    <h1>{APP_TITLE}</h1>
 
     <img src="/image" alt="Random (cached) image" />
-    <p class="muted">devops with kubernetes 2025</p>
+    <p class="muted">{APP_FOOTER}</p>
 
     <h2 style="margin-top:18px;">Create a todo</h2>
     <div class="row">
-      <input id="todoInput" type="text" maxlength="140"
-             placeholder="What needs to be done? (max 140 chars)" />
+      <input id="todoInput" type="text" maxlength="{MAX_TODO_LENGTH}"
+             placeholder="What needs to be done? (max {MAX_TODO_LENGTH} chars)" />
       <button id="todoBtn" disabled>Create todo</button>
     </div>
-    <div class="muted"><span id="counter">0</span>/140</div>
+    <div class="muted"><span id="counter">0</span>/{MAX_TODO_LENGTH}</div>
     <div id="error" class="error" style="display:none;"></div>
 
     <h2 style="margin-top:18px;">Existing todos</h2>
@@ -94,6 +102,8 @@ def root():
   </div>
 
   <script>
+    const API_BASE = {json.dumps(API_BASE)};
+    const MAX_TODO_LENGTH = {MAX_TODO_LENGTH};
     const input = document.getElementById('todoInput');
     const btn = document.getElementById('todoBtn');
     const counter = document.getElementById('counter');
@@ -109,7 +119,7 @@ def root():
     function updateUI() {{
       const len = input.value.length;
       counter.textContent = len.toString();
-      btn.disabled = !(len > 0 && len <= 140);
+      btn.disabled = !(len > 0 && len <= MAX_TODO_LENGTH);
     }}
     input.addEventListener('input', updateUI);
     updateUI();
@@ -117,7 +127,7 @@ def root():
     async function loadTodos() {{
       try {{
         setError('');
-        const r = await fetch('/api/todos', {{ cache: 'no-store' }});
+        const r = await fetch(`${{API_BASE}}/todos`, {{ cache: 'no-store' }});
         if (!r.ok) throw new Error('failed to fetch todos');
         const items = await r.json();
         list.innerHTML = items.length
@@ -132,11 +142,11 @@ def root():
     btn.addEventListener('click', async (e) => {{
       e.preventDefault();
       const text = input.value.trim();
-      if (!text || text.length > 140) return;
+      if (!text || text.length > MAX_TODO_LENGTH) return;
       btn.disabled = true;
       try {{
         setError('');
-        const r = await fetch('/api/todos', {{
+        const r = await fetch(`${{API_BASE}}/todos`, {{
           method: 'POST',
           headers: {{ 'Content-Type': 'application/json' }},
           body: JSON.stringify({{ text }})
@@ -168,7 +178,7 @@ def image():
         try:
             _fetch_and_store()
         except Exception as e:
-            # Degrade gracefully if Picsum is unavailable
+            # Degrade gracefully if image provider is unavailable
             return Response(f"Image fetch failed: {e}\n", status=503, mimetype="text/plain")
     return send_file(IMG_PATH, mimetype="image/jpeg")
 

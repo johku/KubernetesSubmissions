@@ -1,0 +1,12 @@
+# project/todo-app-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: todo-app-config
+  namespace: project
+data:
+  API_BASE: "/api"
+  IMAGE_SOURCE_URL: "https://picsum.photos/1200"
+  IMAGE_TTL_SECONDS: "3600"
+  DATA_DIR: "/data"
+
