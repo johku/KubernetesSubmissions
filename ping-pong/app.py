@@ -1,65 +1,83 @@
-import os
-import threading
+import os, time
+import psycopg2
 from flask import Flask, Response
 
 app = Flask(__name__)
 
-# Configuration via env (no hard-coded values)
+# App config (env-driven)
 PORT = int(os.getenv("PORT", "8080"))
-COUNTER_FILE = os.getenv("COUNTER_FILE")          # e.g., "/data/counter.txt" (optional)
 
-_lock = threading.Lock()
-_counter = 0
+# DB config (env-driven via ConfigMap/Secret)
+PGHOST = os.getenv("PGHOST", "postgres")
+PGPORT = int(os.getenv("PGPORT", "5432"))
+PGDATABASE = os.getenv("PGDATABASE", "pingpong")
+PGUSER = os.getenv("PGUSER", "pingpong")
+PGPASSWORD = os.getenv("PGPASSWORD", "changeme")
+DB_CONNECT_RETRIES = int(os.getenv("DB_CONNECT_RETRIES", "20"))
+DB_CONNECT_BACKOFF = float(os.getenv("DB_CONNECT_BACKOFF", "0.5"))
 
-def _load_counter():
-    """Load counter from file if COUNTER_FILE is set; otherwise start at 0."""
-    if not COUNTER_FILE:
-        return 0
-    try:
-        with open(COUNTER_FILE, "r", encoding="utf-8") as f:
-            return int(f.read().strip() or "0")
-    except FileNotFoundError:
-        return 0
-    except ValueError:
-        return 0
+def dsn():
+    return f"dbname={PGDATABASE} user={PGUSER} password={PGPASSWORD} host={PGHOST} port={PGPORT}"
 
-def _save_counter(value: int):
-    """Persist counter if COUNTER_FILE is set."""
-    if not COUNTER_FILE:
-        return
-    # Ensure directory exists
-    os.makedirs(os.path.dirname(COUNTER_FILE), exist_ok=True)
-    # Write atomically
-    tmp = COUNTER_FILE + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(str(value))
-    os.replace(tmp, COUNTER_FILE)
+def _connect_with_retry():
+    last_err = None
+    for i in range(DB_CONNECT_RETRIES):
+        try:
+            conn = psycopg2.connect(dsn())
+            conn.autocommit = True
+            return conn
+        except Exception as e:
+            last_err = e
+            time.sleep(DB_CONNECT_BACKOFF * (i + 1))
+    raise last_err
 
-# Initialize from disk if configured
-_counter = _load_counter()
+# Global connection (simple for demo)
+_conn = _connect_with_retry()
+
+def _ensure_schema():
+    with _conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS ping_counter (
+                id INT PRIMARY KEY,
+                value INT NOT NULL
+            );
+        """)
+        cur.execute("INSERT INTO ping_counter(id, value) VALUES (1, 0) ON CONFLICT (id) DO NOTHING;")
+
+_ensure_schema()
 
 @app.get("/pingpong")
 def pingpong():
-    global _counter
-    with _lock:
-        n = _counter
-        _counter += 1
-        _save_counter(_counter)
-    return Response(f"pong {n}", mimetype="text/plain")
+    with _conn.cursor() as cur:
+        # increment and return previous value, atomically
+        cur.execute("""
+            UPDATE ping_counter
+               SET value = value + 1
+             WHERE id = 1
+         RETURNING value - 1;
+        """)
+        (previous,) = cur.fetchone()
+    return Response(f"pong {previous}", mimetype="text/plain")
 
 @app.get("/pings")
 def pings():
-    with _lock:
-        value = _counter
-    return Response(str(value), mimetype="text/plain")
+    with _conn.cursor() as cur:
+        cur.execute("SELECT value FROM ping_counter WHERE id = 1;")
+        row = cur.fetchone()
+        count = row[0] if row else 0
+    return Response(str(count), mimetype="text/plain")
 
 @app.get("/healthz")
 def healthz():
-    return Response("ok", mimetype="text/plain")
+    try:
+        with _conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+        return "ok", 200
+    except Exception as e:
+        return f"db error: {e}", 500
 
 if __name__ == "__main__":
     print(f"[ping-pong] PORT={PORT}", flush=True)
-    if COUNTER_FILE:
-        print(f"[ping-pong] COUNTER_FILE={COUNTER_FILE}", flush=True)
+    print(f"[ping-pong] DB={PGUSER}@{PGHOST}:{PGPORT}/{PGDATABASE}", flush=True)
     app.run(host="0.0.0.0", port=PORT)
 

@@ -2,9 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ping-pong
+  namespace: exercises
   labels:
     app: ping-pong
-  namespace: exercises
 spec:
   replicas: 1
   selector:
@@ -17,11 +17,61 @@ spec:
     spec:
       containers:
         - name: ping-pong
-          image: ping-pong:1.3
+          image: ping-pong:1.4
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           env:
             - name: PORT
               value: "8080"
+            - name: PGHOST
+              valueFrom:
+                configMapKeyRef:
+                  name: pingpong-db-config
+                  key: PGHOST
+            - name: PGPORT
+              valueFrom:
+                configMapKeyRef:
+                  name: pingpong-db-config
+                  key: PGPORT
+            - name: PGDATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: pingpong-db-config
+                  key: PGDATABASE
+            - name: PGUSER
+              valueFrom:
+                configMapKeyRef:
+                  name: pingpong-db-config
+                  key: PGUSER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pingpong-db-secret
+                  key: PGPASSWORD
+            - name: DB_CONNECT_RETRIES
+              value: "30"
+            - name: DB_CONNECT_BACKOFF
+              value: "0.5"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
 

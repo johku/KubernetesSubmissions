@@ -1,0 +1,29 @@
+# exercises/postgres-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: exercises
+  labels: { app: postgres }
+spec:
+  selector: { app: postgres }
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: 5432
+---
+# Headless service gives stable DNS for the pod (useful pattern for SS)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: exercises
+  labels: { app: postgres }
+spec:
+  clusterIP: None
+  selector: { app: postgres }
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: 5432
+

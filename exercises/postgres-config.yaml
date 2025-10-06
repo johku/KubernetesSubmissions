@@ -1,0 +1,21 @@
+# exercises/postgres-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pingpong-db-config
+  namespace: exercises
+data:
+  PGHOST: "postgres"        # service DNS name (same ns)
+  PGPORT: "5432"
+  PGDATABASE: "pingpong"
+  PGUSER: "pingpong"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pingpong-db-secret
+  namespace: exercises
+type: Opaque
+stringData:
+  PGPASSWORD: "changeme"    # change to anything
+
