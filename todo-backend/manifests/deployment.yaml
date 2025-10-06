@@ -1,3 +1,4 @@
+# todo-backend/manifests/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -10,8 +11,6 @@ spec:
   selector:
     matchLabels:
       app: todo-backend
-  strategy:
-    type: RollingUpdate
   template:
     metadata:
       labels:
@@ -19,40 +18,37 @@ spec:
     spec:
       containers:
         - name: todo-backend
-          image: todo-backend:1.0
+          image: todo-backend:1.1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
-          # All configuration comes from env (assignment-compliant)
           env:
-            - name: PORT
-              value: "8080"
-            - name: API_PREFIX
-              value: "/api"
-            - name: MAX_TODO_LENGTH
-              value: "140"
-            # Optional: cap request body size (bytes); 0 disables limit
-            - name: MAX_CONTENT_LENGTH
-              value: "0"
+            - { name: PORT, value: "8080" }
+            - { name: API_PREFIX, value: "/api" }
+            - { name: MAX_TODO_LENGTH, value: "140" }
+            - name: PGHOST
+              valueFrom: { configMapKeyRef: { name: todo-db-config, key: PGHOST } }
+            - name: PGPORT
+              valueFrom: { configMapKeyRef: { name: todo-db-config, key: PGPORT } }
+            - name: PGDATABASE
+              valueFrom: { configMapKeyRef: { name: todo-db-config, key: PGDATABASE } }
+            - name: PGUSER
+              valueFrom: { configMapKeyRef: { name: todo-db-config, key: PGUSER } }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: todo-db-secret, key: PGPASSWORD } }
+            - { name: DB_CONNECT_RETRIES, value: "30" }
+            - { name: DB_CONNECT_BACKOFF, value: "0.5" }
           readinessProbe:
-            httpGet:
-              path: /healthz
-              port: 8080
+            httpGet: { path: /healthz, port: 8080 }
             initialDelaySeconds: 2
             periodSeconds: 5
             timeoutSeconds: 2
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8080
+            httpGet: { path: /healthz, port: 8080 }
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 2
           resources:
-            requests:
-              cpu: "10m"
-              memory: "64Mi"
-            limits:
-              cpu: "200m"
-              memory: "256Mi"
+            requests: { cpu: "10m", memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
 

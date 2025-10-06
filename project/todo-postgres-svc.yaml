@@ -1,0 +1,28 @@
+# project/todo-postgres-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-postgres
+  namespace: project
+  labels: { app: todo-postgres }
+spec:
+  selector: { app: todo-postgres }
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-postgres-headless
+  namespace: project
+  labels: { app: todo-postgres }
+spec:
+  clusterIP: None
+  selector: { app: todo-postgres }
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: 5432
+

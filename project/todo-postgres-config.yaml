@@ -1,0 +1,21 @@
+# project/todo-postgres-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: todo-db-config
+  namespace: project
+data:
+  PGHOST: "todo-postgres"
+  PGPORT: "5432"
+  PGDATABASE: "todos"
+  PGUSER: "todoapp"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: todo-db-secret
+  namespace: project
+type: Opaque
+stringData:
+  PGPASSWORD: "changeme"   # set to something else if you want
+
