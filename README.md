@@ -43,3 +43,5 @@
 [2.8](https://github.com/johku/KubernetesSubmissions/tree/2.8/project)
 
 [2.9](https://github.com/johku/KubernetesSubmissions/tree/2.9/wiki-todo)
+
+[2.10](https://github.com/johku/KubernetesSubmissions/tree/2.10/monitoring)
